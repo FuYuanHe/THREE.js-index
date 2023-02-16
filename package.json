@@ -11,6 +11,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "cannon-es": "^0.20.0",
     "dat.gui": "^0.7.9",
     "gsap": "^3.11.4",
     "parcel-bundler": "^1.12.5",
