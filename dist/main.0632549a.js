@@ -58947,11 +58947,61 @@ camera.position.set(0, 0, 18);
 scene.add(camera);
 
 // 创建球和平面
-var sphereGeomethy = new THREE.SphereGeometry(1, 20, 20);
-var sphereMaterial = new THREE.MeshStandardMaterial();
-var sphere = new THREE.Mesh(sphereGeomethy, sphereMaterial);
-sphere.castShadow = true;
-scene.add(sphere);
+// const sphereGeomethy = new THREE.SphereGeometry(1,20,20)
+// const sphereMaterial = new THREE.MeshStandardMaterial()
+// const sphere = new THREE.Mesh(sphereGeomethy,sphereMaterial)
+// sphere.castShadow = true
+// scene.add(sphere)
+
+// 定义音乐
+var hitSound = new Audio('assets/sound.mp3');
+var boxShapeMaterial = new CANNON.Material('default');
+// 创建立方体的函数
+var boxArr = [];
+var createBox = function createBox() {
+  // 创建立方体和平面
+  var boxGeomethy = new THREE.BoxGeometry(1, 1, 1);
+  var boxMaterial = new THREE.MeshStandardMaterial();
+  var box = new THREE.Mesh(boxGeomethy, boxMaterial);
+  box.castShadow = true;
+  scene.add(box);
+
+  // 创建物理立方体
+  var boxShape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
+  // 设置材质
+
+  var boxBody = new CANNON.Body({
+    shape: boxShape,
+    position: new CANNON.Vec3(0, 0, 0),
+    // 小球的质量
+    mass: 1,
+    // 小球的材质
+    material: boxShapeMaterial
+  });
+  // 创建物体的时候可以添加额外的力，使其不总是垂直向下
+  // applyLocalForce的参数是力度的大小和方向，和力度的中心点
+  boxBody.applyLocalForce(new CANNON.Vec3(180, 0, 0), new CANNON.Vec3(0, 0, 0));
+  // 将物体添加到世界
+  world.addBody(boxBody);
+
+  //  添加碰撞的监听事件
+  var boxBodyHit = function boxBodyHit(e) {
+    // 获取碰撞的强弱
+    var impactNumber = e.contact.getImpactVelocityAlongNormal();
+    // console.log('impactNumber', impactNumber);
+    hitSound.currentTime = 0; // 设置声音多次播放
+    // 根据碰撞的强弱设置声音的大小impactNumber
+    hitSound.volume = impactNumber / 10;
+    if (hitSound.volume > 0 && hitSound.volume <= 1) hitSound.play();
+  };
+  boxBody.addEventListener('collide', boxBodyHit);
+
+  // 将现实世界的box和物理世界的boxbody同时加入数组
+  boxArr.push({
+    mesh: box,
+    body: boxBody
+  });
+};
 var floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial());
 floor.position.set(0, -5, 0);
 floor.rotation.x = -Math.PI / 2;
@@ -58962,31 +59012,22 @@ scene.add(floor);
 var world = new CANNON.World();
 world.gravity.set(0, -9.8, 0);
 // 或者world.gravity.set(0,-9.8,0)
-// 创建物理小球
-var sphereShape = new CANNON.Sphere(1);
-// 设置材质
-var sphereShapeMaterial = new CANNON.Material('default');
-var sphereBody = new CANNON.Body({
-  shape: sphereShape,
-  position: new CANNON.Vec3(0, 0, 0),
-  // 小球的质量
-  mass: 1,
-  // 小球的材质
-  material: sphereShapeMaterial
-});
-// 将物体添加到世界
-world.addBody(sphereBody);
-var hitSound = new Audio('assets/sound.mp3');
 
-//  添加碰撞的监听事件
-var sphereBodyHit = function sphereBodyHit(e) {
-  // 获取碰撞的强弱
-  var impactNumber = e.contact.getImpactVelocityAlongNormal();
-  console.log('impactNumber', impactNumber);
-  hitSound.currentTime = 0; // 设置声音多次播放
-  hitSound.play();
-};
-sphereBody.addEventListener('collide', sphereBodyHit);
+// 创建物理小球
+// const sphereShape = new CANNON.Sphere(1)
+// // 设置材质
+// const sphereShapeMaterial = new CANNON.Material('default')
+// const sphereBody = new CANNON.Body({
+//     shape:sphereShape,
+//     position:new CANNON.Vec3(0,0,0),
+//     // 小球的质量
+//     mass:1,
+//     // 小球的材质
+//     material:sphereShapeMaterial
+// })
+// // 将物体添加到世界
+// world.addBody(sphereBody)
+
 // 创建物理地面
 var floorShape = new CANNON.Plane();
 var floorBody = new CANNON.Body();
@@ -58999,13 +59040,14 @@ floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2); /
 world.addBody(floorBody);
 
 // 设置小球的材质和地面的材质关联，设置摩擦和弹力
-var defauluConcatMaterial = new CANNON.ContactMaterial(sphereMaterial, floorMaterial, {
+var defauluConcatMaterial = new CANNON.ContactMaterial(boxShapeMaterial, floorMaterial, {
   friction: 0.1,
   // 摩擦力
   restitution: 0.7 // 弹力
 });
 // 将关联材质添加到世界中
 world.addContactMaterial(defauluConcatMaterial);
+world.defaultContactMaterial = defauluConcatMaterial;
 
 // 添加环境光和平行光
 var ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -59053,7 +59095,13 @@ function render() {
   //step 参数为多少帧，两帧的时间差
   world.step(1 / 120, time2);
   // 将两个物体关联，拷贝物理世界物体的位置给sphere
-  sphere.position.copy(sphereBody.position);
+  // box.position.copy(boxBody.position)
+  boxArr.forEach(function (item) {
+    // 遍历保存物理世界物体的位置信息
+    item.mesh.position.copy(item.body.position);
+    // 保存物理世界物体的旋转信息
+    item.mesh.quaternion.copy(item.body.quaternion);
+  });
 
   // controls.update()
   renderer.render(scene, camera);
@@ -59061,6 +59109,9 @@ function render() {
   requestAnimationFrame(render);
 }
 render();
+
+// 点击创建立方体
+window.addEventListener('click', createBox);
 
 // 监听画面的变化，如浏览器窗口变大变小，重新渲染画面
 window.addEventListener('resize', function () {
