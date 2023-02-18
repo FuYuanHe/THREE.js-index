@@ -43,7 +43,7 @@ world.gravity.set(0, -9.8, 0)
 // 创建物理小球
 const sphereShape = new CANNON.Sphere(1)
 // 设置材质
-const sphereShapeMaterial = new CANNON.Material()
+const sphereShapeMaterial = new CANNON.Material('default')
 const sphereBody = new CANNON.Body({
     shape:sphereShape,
     position:new CANNON.Vec3(0,0,0),
@@ -61,19 +61,28 @@ const sphereBodyHit = (e) => {
     // 获取碰撞的强弱
     const impactNumber = e.contact.getImpactVelocityAlongNormal()
     console.log('impactNumber',impactNumber);
+    hitSound.currentTime=0 // 设置声音多次播放
     hitSound.play()
-
-
 }
 sphereBody.addEventListener('collide',sphereBodyHit)
 // 创建物理地面
 const floorShape = new CANNON.Plane()
 const floorBody = new CANNON.Body()
+const floorMaterial = new CANNON.Material()
+floorBody.material = floorMaterial
 floorBody.mass =0 // 为0时，物体不动
 floorBody.addShape(floorShape) // 添加地面
 floorBody.position.set(0,-5,0) // 设置位置
 floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0),-Math.PI/2) // 旋转位置
 world.addBody(floorBody)
+
+// 设置小球的材质和地面的材质关联，设置摩擦和弹力
+const defauluConcatMaterial = new CANNON.ContactMaterial(sphereMaterial,floorMaterial,{
+    friction:0.1, // 摩擦力
+    restitution:0.7 // 弹力
+})
+// 将关联材质添加到世界中
+world.addContactMaterial(defauluConcatMaterial)
 
 
 
