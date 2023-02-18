@@ -58976,6 +58976,14 @@ var sphereBody = new CANNON.Body({
 });
 // 将物体添加到世界
 world.addBody(sphereBody);
+// 创建物理地面
+var floorShape = new CANNON.Plane();
+var floorBody = new CANNON.Body();
+floorBody.mass = 0; // 为0时，物体不动
+floorBody.addShape(floorShape); // 添加地面
+floorBody.position.set(0, -5, 0); // 设置位置
+floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2); // 旋转位置
+world.addBody(floorBody);
 
 // 添加环境光和平行光
 var ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
