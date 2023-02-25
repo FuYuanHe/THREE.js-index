@@ -58921,6 +58921,10 @@ World.prototype.clearForces = function(){
 },{"../collision/AABB":3,"../collision/ArrayCollisionMatrix":4,"../collision/NaiveBroadphase":7,"../collision/Ray":9,"../collision/RaycastResult":10,"../equations/ContactEquation":19,"../equations/FrictionEquation":21,"../material/ContactMaterial":24,"../material/Material":25,"../math/Quaternion":28,"../math/Vec3":30,"../objects/Body":31,"../shapes/Shape":43,"../solver/GSSolver":46,"../utils/EventTarget":49,"../utils/TupleDictionary":52,"../utils/Vec3Pool":54,"./Narrowphase":55}]},{},[2])
 (2)
 });
+},{}],"shader/raw/vertex.glsl":[function(require,module,exports) {
+module.exports = "precision lowp float;\n#define GLSLIFY 1\n // 声明gpu低精度 一般放在程序最前面\nattribute vec3 position;\nattribute vec2 uv;\n\nuniform mat4 modelMatrix;\nuniform mat4 viewMatrix;\nuniform mat4 projectionMatrix;\n\nvarying vec2 vUv; // 将顶点着色器的信息传递给片元着色器\nvarying float deep; // 生命一个浮点值变量deep，传递给片元着色器\n\nvoid main(){\n    vUv = uv;\n    vec4 modelPosition = modelMatrix *vec4(position,1.0);\n    // modelPosition.z += modelPosition.x;\n    modelPosition.z = sin(modelPosition.x*10.0)*0.1;\n    modelPosition.z += sin(modelPosition.y*10.0)*0.1;\n    deep = modelPosition.z; // 给deep赋值\n    gl_Position = projectionMatrix * viewMatrix * modelPosition;\n}";
+},{}],"shader/raw/fragment.glsl":[function(require,module,exports) {
+module.exports = "precision lowp float;\n#define GLSLIFY 1\n // 定义gpu编译精度\nvarying vec2 vUv; // 接收顶点着色器传递过来的vUv\nvarying float deep; // 接收顶点着色器传递过来的deep\n\nvoid main(){\n     float deeps = deep + 0.05*10.0; // 不能直接修改deep的值，定义一个中间变量deeps接收修改的值\n     gl_FragColor = vec4(0.0,1.0*deeps,0.0,1.0);\n}";
 },{}],"main/main.js":[function(require,module,exports) {
 "use strict";
 
@@ -58930,6 +58934,8 @@ var dat = _interopRequireWildcard(require("dat.gui"));
 var _gsap = _interopRequireDefault(require("gsap"));
 var _RGBELoader = require("three/examples/jsm/loaders/RGBELoader");
 var CANNON = _interopRequireWildcard(require("cannon"));
+var _vertex = _interopRequireDefault(require("./../shader/raw/vertex.glsl"));
+var _fragment = _interopRequireDefault(require("./../shader/raw/fragment.glsl"));
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
 function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
@@ -58953,101 +58959,21 @@ scene.add(camera);
 // sphere.castShadow = true
 // scene.add(sphere)
 
-// 定义音乐
-var hitSound = new Audio('assets/sound.mp3');
-var boxShapeMaterial = new CANNON.Material('default');
-// 创建立方体的函数
-var boxArr = [];
-var createBox = function createBox() {
-  // 创建立方体和平面
-  var boxGeomethy = new THREE.BoxGeometry(1, 1, 1);
-  var boxMaterial = new THREE.MeshStandardMaterial();
-  var box = new THREE.Mesh(boxGeomethy, boxMaterial);
-  box.castShadow = true;
-  scene.add(box);
-
-  // 创建物理立方体
-  var boxShape = new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5));
-  // 设置材质
-
-  var boxBody = new CANNON.Body({
-    shape: boxShape,
-    position: new CANNON.Vec3(0, 0, 0),
-    // 小球的质量
-    mass: 1,
-    // 小球的材质
-    material: boxShapeMaterial
-  });
-  // 创建物体的时候可以添加额外的力，使其不总是垂直向下
-  // applyLocalForce的参数是力度的大小和方向，和力度的中心点
-  boxBody.applyLocalForce(new CANNON.Vec3(180, 0, 0), new CANNON.Vec3(0, 0, 0));
-  // 将物体添加到世界
-  world.addBody(boxBody);
-
-  //  添加碰撞的监听事件
-  var boxBodyHit = function boxBodyHit(e) {
-    // 获取碰撞的强弱
-    var impactNumber = e.contact.getImpactVelocityAlongNormal();
-    // console.log('impactNumber', impactNumber);
-    hitSound.currentTime = 0; // 设置声音多次播放
-    // 根据碰撞的强弱设置声音的大小impactNumber
-    hitSound.volume = impactNumber / 10;
-    if (hitSound.volume > 0 && hitSound.volume <= 1) hitSound.play();
-  };
-  boxBody.addEventListener('collide', boxBodyHit);
-
-  // 将现实世界的box和物理世界的boxbody同时加入数组
-  boxArr.push({
-    mesh: box,
-    body: boxBody
-  });
-};
-var floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 20), new THREE.MeshStandardMaterial());
-floor.position.set(0, -5, 0);
-floor.rotation.x = -Math.PI / 2;
-floor.receiveShadow = true;
-scene.add(floor);
-
-// 创建物理世界
-var world = new CANNON.World();
-world.gravity.set(0, -9.8, 0);
-// 或者world.gravity.set(0,-9.8,0)
-
-// 创建物理小球
-// const sphereShape = new CANNON.Sphere(1)
-// // 设置材质
-// const sphereShapeMaterial = new CANNON.Material('default')
-// const sphereBody = new CANNON.Body({
-//     shape:sphereShape,
-//     position:new CANNON.Vec3(0,0,0),
-//     // 小球的质量
-//     mass:1,
-//     // 小球的材质
-//     material:sphereShapeMaterial
-// })
-// // 将物体添加到世界
-// world.addBody(sphereBody)
-
-// 创建物理地面
-var floorShape = new CANNON.Plane();
-var floorBody = new CANNON.Body();
-var floorMaterial = new CANNON.Material();
-floorBody.material = floorMaterial;
-floorBody.mass = 0; // 为0时，物体不动
-floorBody.addShape(floorShape); // 添加地面
-floorBody.position.set(0, -5, 0); // 设置位置
-floorBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1, 0, 0), -Math.PI / 2); // 旋转位置
-world.addBody(floorBody);
-
-// 设置小球的材质和地面的材质关联，设置摩擦和弹力
-var defauluConcatMaterial = new CANNON.ContactMaterial(boxShapeMaterial, floorMaterial, {
-  friction: 0.1,
-  // 摩擦力
-  restitution: 0.7 // 弹力
+var material = new THREE.MeshBasicMaterial({
+  color: "#bfa"
 });
-// 将关联材质添加到世界中
-world.addContactMaterial(defauluConcatMaterial);
-world.defaultContactMaterial = defauluConcatMaterial;
+// 编写程序实现材质
+var shaderMaterial = new THREE.RawShaderMaterial({
+  vertexShader: _vertex.default,
+  fragmentShader: _fragment.default,
+  // wireframe:true,
+  side: THREE.DoubleSide
+});
+var floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, 64, 64), shaderMaterial);
+floor.position.set(0, 0, 0);
+// floor.rotation.x = -Math.PI / 2
+// floor.receiveShadow = true
+scene.add(floor);
 
 // 添加环境光和平行光
 var ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
@@ -59090,28 +59016,11 @@ function render() {
   // 设置小球随着大球做圆周运动
   var time = clock.getElapsedTime();
   var time2 = clock.getDelta();
-  // console.log('sphereBody.position',sphereBody.position);
-  // 及时推进物理世界，更新物理引擎里世界的物体
-  //step 参数为多少帧，两帧的时间差
-  world.step(1 / 120, time2);
-  // 将两个物体关联，拷贝物理世界物体的位置给sphere
-  // box.position.copy(boxBody.position)
-  boxArr.forEach(function (item) {
-    // 遍历保存物理世界物体的位置信息
-    item.mesh.position.copy(item.body.position);
-    // 保存物理世界物体的旋转信息
-    item.mesh.quaternion.copy(item.body.quaternion);
-  });
-
-  // controls.update()
   renderer.render(scene, camera);
   // 请求关键帧，下一帧的时候会继续调用render函数
   requestAnimationFrame(render);
 }
 render();
-
-// 点击创建立方体
-window.addEventListener('click', createBox);
 
 // 监听画面的变化，如浏览器窗口变大变小，重新渲染画面
 window.addEventListener('resize', function () {
@@ -59124,7 +59033,7 @@ window.addEventListener('resize', function () {
   // 设置渲染器的像素比例
   renderer.setPixelRatio(window.devicePixelRatio);
 });
-},{"three":"../node_modules/three/build/three.module.js","three/examples/jsm/controls/OrbitControls":"../node_modules/three/examples/jsm/controls/OrbitControls.js","dat.gui":"../node_modules/dat.gui/build/dat.gui.module.js","gsap":"../node_modules/gsap/index.js","three/examples/jsm/loaders/RGBELoader":"../node_modules/three/examples/jsm/loaders/RGBELoader.js","cannon":"../node_modules/cannon/build/cannon.js"}],"../node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+},{"three":"../node_modules/three/build/three.module.js","three/examples/jsm/controls/OrbitControls":"../node_modules/three/examples/jsm/controls/OrbitControls.js","dat.gui":"../node_modules/dat.gui/build/dat.gui.module.js","gsap":"../node_modules/gsap/index.js","three/examples/jsm/loaders/RGBELoader":"../node_modules/three/examples/jsm/loaders/RGBELoader.js","cannon":"../node_modules/cannon/build/cannon.js","./../shader/raw/vertex.glsl":"shader/raw/vertex.glsl","./../shader/raw/fragment.glsl":"shader/raw/fragment.glsl"}],"../node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -59149,7 +59058,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "64204" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "49257" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
