@@ -14,7 +14,7 @@ const scene = new THREE.Scene()
 // 创建场景
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 300)
 const textureLoader = new THREE.TextureLoader()
-const texture = textureLoader.load('./texture/ball.png')
+const texture = textureLoader.load('./texture/bg.jpg')
 
 // 设置位置
 camera.position.set(0, 0, 18)
@@ -36,6 +36,14 @@ const shaderMaterial = new THREE.RawShaderMaterial({
     fragmentShader:rawFragmentShader,
     // wireframe:true,
     side:THREE.DoubleSide,
+    uniforms:{
+        uTime:{
+            value:0
+        },
+        uTexture:{
+            value:texture
+        }
+    }
 })
 
 const floor = new THREE.Mesh(
@@ -59,6 +67,7 @@ scene.add(dirLight)
 
 
 // 初始化渲染器
+// const renderer = new THREE.WebGL1Renderer({ alpha: true })
 const renderer = new THREE.WebGL1Renderer({ alpha: true })
 // 设置渲染器的尺寸
 renderer.setSize(window.innerWidth, window.innerHeight)
@@ -88,19 +97,35 @@ scene.add(axesHelper)
 // render函数的时间只有一个，如果有多个物体则不方便，这时，可以使用Clock、
 let clock = new THREE.Clock()
 
-function render() {
+// function render() { 
+//     // 这个函数名可以叫render也可以叫animate等别的，注意下面函数调用和请求关键帧的参数即可
+//     // render函数会接收一个time参数，实际移动的距离需要根据时间和速度来计算,不能直接加一个固定的数值
+//     // 可以获取两帧之间的时间差  clock.getElapsedTime()
+//     // 设置小球随着大球做圆周运动
+//     let time = clock.getElapsedTime()
+//     let time2 = clock.getDelta()
+
+//     renderer.render(scene, camera)
+//     // 请求关键帧，下一帧的时候会继续调用render函数
+//     requestAnimationFrame(render)
+// }
+
+// render()
+
+function animate() { 
+    // 这个函数名可以叫render也可以叫animate等别的，注意下面函数调用和请求关键帧的参数即可
     // render函数会接收一个time参数，实际移动的距离需要根据时间和速度来计算,不能直接加一个固定的数值
     // 可以获取两帧之间的时间差  clock.getElapsedTime()
     // 设置小球随着大球做圆周运动
     let time = clock.getElapsedTime()
     let time2 = clock.getDelta()
-
+    shaderMaterial.uniforms.uTime.value = time
     renderer.render(scene, camera)
     // 请求关键帧，下一帧的时候会继续调用render函数
-    requestAnimationFrame(render)
+    requestAnimationFrame(animate)
 }
 
-render()
+animate()
 
 
 // 监听画面的变化，如浏览器窗口变大变小，重新渲染画面

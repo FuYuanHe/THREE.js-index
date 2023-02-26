@@ -58922,9 +58922,9 @@ World.prototype.clearForces = function(){
 (2)
 });
 },{}],"shader/raw/vertex.glsl":[function(require,module,exports) {
-module.exports = "precision lowp float;\n#define GLSLIFY 1\n // 声明gpu低精度 一般放在程序最前面\nattribute vec3 position;\nattribute vec2 uv;\n\nuniform mat4 modelMatrix;\nuniform mat4 viewMatrix;\nuniform mat4 projectionMatrix;\n\nvarying vec2 vUv; // 将顶点着色器的信息传递给片元着色器\nvarying float deep; // 生命一个浮点值变量deep，传递给片元着色器\n\nvoid main(){\n    vUv = uv;\n    vec4 modelPosition = modelMatrix *vec4(position,1.0);\n    // modelPosition.z += modelPosition.x;\n    modelPosition.z = sin(modelPosition.x*10.0)*0.1;\n    modelPosition.z += sin(modelPosition.y*10.0)*0.1;\n    deep = modelPosition.z; // 给deep赋值\n    gl_Position = projectionMatrix * viewMatrix * modelPosition;\n}";
+module.exports = "precision lowp float;\n#define GLSLIFY 1\n // 声明gpu低精度 一般放在程序最前面\nattribute vec3 position;\nattribute vec2 uv;\n\nuniform mat4 modelMatrix;\nuniform mat4 viewMatrix;\nuniform mat4 projectionMatrix;\n\n// 获取着色器材质声明的事件变量\nuniform float uTime;\n\nvarying vec2 vUv; // 将顶点着色器的信息传递给片元着色器\nvarying float deep; // 生命一个浮点值变量deep，传递给片元着色器\n\nvoid main(){\n    vUv = uv;\n    vec4 modelPosition = modelMatrix *vec4(position,1.0);\n    // modelPosition.z += modelPosition.x;\n    modelPosition.z = sin((modelPosition.x + uTime)*10.0)*0.1;\n    modelPosition.z += sin((modelPosition.y + uTime)*10.0)*0.1;\n    deep = modelPosition.z; // 给deep赋值\n    gl_Position = projectionMatrix * viewMatrix * modelPosition;\n}";
 },{}],"shader/raw/fragment.glsl":[function(require,module,exports) {
-module.exports = "precision lowp float;\n#define GLSLIFY 1\n // 定义gpu编译精度\nvarying vec2 vUv; // 接收顶点着色器传递过来的vUv\nvarying float deep; // 接收顶点着色器传递过来的deep\n\nvoid main(){\n     float deeps = deep + 0.05*10.0; // 不能直接修改deep的值，定义一个中间变量deeps接收修改的值\n     gl_FragColor = vec4(0.0,1.0*deeps,0.0,1.0);\n}";
+module.exports = "precision lowp float;\n#define GLSLIFY 1\n // 定义gpu编译精度\nvarying vec2 vUv; // 接收顶点着色器传递过来的vUv\nvarying float deep; // 接收顶点着色器传递过来的deep\n\nuniform sampler2D uTexture; // 设置采样的纹理\n\nvoid main(){\n     // float deeps = deep + 0.05*10.0; // 不能直接修改deep的值，定义一个中间变量deeps接收修改的值\n     vec4 textureColor = texture2D(uTexture,vUv);\n     // textureColor.rgb *= deeps;\n     gl_FragColor = textureColor;\n}";
 },{}],"main/main.js":[function(require,module,exports) {
 "use strict";
 
@@ -58944,7 +58944,7 @@ var scene = new THREE.Scene();
 // 创建场景
 var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 300);
 var textureLoader = new THREE.TextureLoader();
-var texture = textureLoader.load('./texture/ball.png');
+var texture = textureLoader.load('./texture/bg.jpg');
 
 // 设置位置
 camera.position.set(0, 0, 18);
@@ -58967,7 +58967,15 @@ var shaderMaterial = new THREE.RawShaderMaterial({
   vertexShader: _vertex.default,
   fragmentShader: _fragment.default,
   // wireframe:true,
-  side: THREE.DoubleSide
+  side: THREE.DoubleSide,
+  uniforms: {
+    uTime: {
+      value: 0
+    },
+    uTexture: {
+      value: texture
+    }
+  }
 });
 var floor = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, 64, 64), shaderMaterial);
 floor.position.set(0, 0, 0);
@@ -58983,6 +58991,7 @@ dirLight.castShadow = true;
 scene.add(dirLight);
 
 // 初始化渲染器
+// const renderer = new THREE.WebGL1Renderer({ alpha: true })
 var renderer = new THREE.WebGL1Renderer({
   alpha: true
 });
@@ -59010,17 +59019,35 @@ scene.add(axesHelper);
 
 // render函数的时间只有一个，如果有多个物体则不方便，这时，可以使用Clock、
 var clock = new THREE.Clock();
-function render() {
+
+// function render() { 
+//     // 这个函数名可以叫render也可以叫animate等别的，注意下面函数调用和请求关键帧的参数即可
+//     // render函数会接收一个time参数，实际移动的距离需要根据时间和速度来计算,不能直接加一个固定的数值
+//     // 可以获取两帧之间的时间差  clock.getElapsedTime()
+//     // 设置小球随着大球做圆周运动
+//     let time = clock.getElapsedTime()
+//     let time2 = clock.getDelta()
+
+//     renderer.render(scene, camera)
+//     // 请求关键帧，下一帧的时候会继续调用render函数
+//     requestAnimationFrame(render)
+// }
+
+// render()
+
+function animate() {
+  // 这个函数名可以叫render也可以叫animate等别的，注意下面函数调用和请求关键帧的参数即可
   // render函数会接收一个time参数，实际移动的距离需要根据时间和速度来计算,不能直接加一个固定的数值
   // 可以获取两帧之间的时间差  clock.getElapsedTime()
   // 设置小球随着大球做圆周运动
   var time = clock.getElapsedTime();
   var time2 = clock.getDelta();
+  shaderMaterial.uniforms.uTime.value = time;
   renderer.render(scene, camera);
   // 请求关键帧，下一帧的时候会继续调用render函数
-  requestAnimationFrame(render);
+  requestAnimationFrame(animate);
 }
-render();
+animate();
 
 // 监听画面的变化，如浏览器窗口变大变小，重新渲染画面
 window.addEventListener('resize', function () {
@@ -59058,7 +59085,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "49257" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "51611" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
