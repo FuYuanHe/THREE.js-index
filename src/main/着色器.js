@@ -3,26 +3,18 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls'
 import * as dat from 'dat.gui'
 import gsap from 'gsap'
 import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader'
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { Mesh, MeshBasicMaterial } from 'three'
 import * as CANNON from 'cannon'
-import vertexShader from '../shader/flyLight/vertex.glsl'
-import fragmentShader from '../shader/flyLight/fragment.glsl'
+import deepVertexShader from '../shader/deep/vertex.glsl'
+import deepFragmentShader from '../shader/deep/fragment.glsl'
 
 
 // 创建相机
 const scene = new THREE.Scene()
 // 创建场景
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 300)
-// 加载环境纹理
-const rgbeLoader = new RGBELoader()
-rgbeLoader.loadAsync('./texture/001.hdr').then(texture => {
-    texture.mapping = THREE.EquirectangularReflectionMapping
-    scene.background = texture
-    scene.environment = texture
-})
-// const textureLoader = new THREE.TextureLoader()
-// const texture = textureLoader.load('./texture/bg.jpg')
+const textureLoader = new THREE.TextureLoader()
+const texture = textureLoader.load('./texture/bg.jpg')
 
 // 设置位置
 camera.position.set(0, 0, 18)
@@ -40,29 +32,28 @@ scene.add(camera)
 const material = new THREE.MeshBasicMaterial({color:"#bfa"})
 // 编写程序实现材质
 const shaderMaterial = new THREE.RawShaderMaterial({
-    vertexShader:vertexShader,
-    fragmentShader:fragmentShader,
+    vertexShader:deepVertexShader,
+    fragmentShader:deepFragmentShader,
     // wireframe:true,
     side:THREE.DoubleSide,
     uniforms:{
         uTime:{
             value:0
         },
-        // uTexture:{
-        //     value:texture
-        // }
-    },
-    // transparent:true
+        uTexture:{
+            value:texture
+        }
+    }
 })
 
-// const floor = new THREE.Mesh(
-//     new THREE.PlaneGeometry(1,1,64, 64),
-//     shaderMaterial
-// )
-// floor.position.set(0, 0, 0)
-// // floor.rotation.x = -Math.PI / 2
-// // floor.receiveShadow = true
-// scene.add(floor)
+const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(1,1,64, 64),
+    shaderMaterial
+)
+floor.position.set(0, 0, 0)
+// floor.rotation.x = -Math.PI / 2
+// floor.receiveShadow = true
+scene.add(floor)
 
 
 
@@ -78,41 +69,6 @@ scene.add(dirLight)
 // 初始化渲染器
 // const renderer = new THREE.WebGL1Renderer({ alpha: true })
 const renderer = new THREE.WebGL1Renderer({ alpha: true })
-renderer.outputEncoding = THREE.sRGBEncoding
-renderer.toneMapping = THREE.ACESFilmicToneMapping
-// 设置曝光
-renderer.toneMappingExposure = 0.01
-
-const gltfLoader = new GLTFLoader()
-let lightBox = null
-gltfLoader.load('./model/fly.glb',(gltf)=>{
-    console.log(gltf);
-    // scene.add(gltf.scene)
-    lightBox = gltf.scene.children[0]
-    lightBox.material = shaderMaterial
-
-    for(let i=0;i<100;i++){
-        let flyLight =  gltf.scene.clone(true)
-        let x = (Math.random()-0.5)*300
-        let z = (Math.random()-0.5)*100
-        let y = (Math.random()-0.5)*30+25
-        flyLight.position.set(x,y,z)
-        gsap.to(flyLight.rotation,{
-            y:2*Math.PI,
-            duration:10+ Math.random()*10,
-            yoyo:true,
-            repeat:-1
-        })
-        gsap.to(flyLight.position,{
-           x:'+='+Math.random()*5,
-           y:'+='+Math.random()*20,
-           duration:5+ Math.random()*10,
-           yoyo:true,
-           repeat:-1
-        })
-        scene.add(flyLight)
-    }
-})
 // 设置渲染器的尺寸
 renderer.setSize(window.innerWidth, window.innerHeight)
 
@@ -134,17 +90,9 @@ const controls = new OrbitControls(camera, renderer.domElement)
 // 设置控制器的阻尼，使其拥有惯性,更加真实，且要在动画循环中更新，在render函数中
 controls.enableDamping = true
 
-// 设置控制器的自动旋转
-controls.autoRotate = true
-// 旋转的速度
-controls.autoRotateSpeed = 0.1
-// 旋转的角度
-controls.maxPolarAngle = Math.PI/4*3
-controls.minPolarAngle = Math.PI/4*3
-
 // 创建坐标轴辅助器
-// const axesHelper = new THREE.AxesHelper(5)
-// scene.add(axesHelper)
+const axesHelper = new THREE.AxesHelper(5)
+scene.add(axesHelper)
 
 // render函数的时间只有一个，如果有多个物体则不方便，这时，可以使用Clock、
 let clock = new THREE.Clock()
@@ -169,10 +117,9 @@ function animate() {
     // render函数会接收一个time参数，实际移动的距离需要根据时间和速度来计算,不能直接加一个固定的数值
     // 可以获取两帧之间的时间差  clock.getElapsedTime()
     // 设置小球随着大球做圆周运动
-    controls.update()
     let time = clock.getElapsedTime()
     let time2 = clock.getDelta()
-    // shaderMaterial.uniforms.uTime.value = time
+    shaderMaterial.uniforms.uTime.value = time
     renderer.render(scene, camera)
     // 请求关键帧，下一帧的时候会继续调用render函数
     requestAnimationFrame(animate)
