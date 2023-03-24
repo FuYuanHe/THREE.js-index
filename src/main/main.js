@@ -6,23 +6,15 @@ import { RGBELoader } from 'three/examples/jsm/loaders/RGBELoader'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader'
 import { Mesh, MeshBasicMaterial } from 'three'
 import * as CANNON from 'cannon'
-import vertexShader from '../shader/flyLight/vertex.glsl'
-import fragmentShader from '../shader/flyLight/fragment.glsl'
+import vertexShader from '../shader/water/vertex.glsl'
+import fragmentShader from '../shader/water/fragment.glsl'
 
-
+// 创建gui的控制器
+const gui = new dat.GUI();
 // 创建相机
 const scene = new THREE.Scene()
 // 创建场景
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 300)
-// 加载环境纹理
-const rgbeLoader = new RGBELoader()
-rgbeLoader.loadAsync('./texture/001.hdr').then(texture => {
-    texture.mapping = THREE.EquirectangularReflectionMapping
-    scene.background = texture
-    scene.environment = texture
-})
-// const textureLoader = new THREE.TextureLoader()
-// const texture = textureLoader.load('./texture/bg.jpg')
 
 // 设置位置
 camera.position.set(0, 0, 18)
@@ -30,96 +22,129 @@ camera.position.set(0, 0, 18)
 // 把相机加到页面
 scene.add(camera)
 
-// 创建球和平面
-// const sphereGeomethy = new THREE.SphereGeometry(1,20,20)
-// const sphereMaterial = new THREE.MeshStandardMaterial()
-// const sphere = new THREE.Mesh(sphereGeomethy,sphereMaterial)
-// sphere.castShadow = true
-// scene.add(sphere)
-
-const material = new THREE.MeshBasicMaterial({color:"#bfa"})
-// 编写程序实现材质
-const shaderMaterial = new THREE.RawShaderMaterial({
-    vertexShader:vertexShader,
-    fragmentShader:fragmentShader,
-    // wireframe:true,
-    side:THREE.DoubleSide,
-    uniforms:{
-        uTime:{
-            value:0
-        },
-        // uTexture:{
-        //     value:texture
-        // }
-    },
-    // transparent:true
-})
-
-// const floor = new THREE.Mesh(
-//     new THREE.PlaneGeometry(1,1,64, 64),
-//     shaderMaterial
-// )
-// floor.position.set(0, 0, 0)
-// // floor.rotation.x = -Math.PI / 2
-// // floor.receiveShadow = true
-// scene.add(floor)
+// 创建坐标轴辅助器
+const axesHelper = new THREE.AxesHelper(5)
+scene.add(axesHelper)
 
 
 
 // 添加环境光和平行光
-const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
-scene.add(ambientLight)
-const dirLight = new THREE.DirectionalLight(0xffffff, 0.5)
-dirLight.castShadow = true
-scene.add(dirLight)
+// const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+// scene.add(ambientLight)
+// const dirLight = new THREE.DirectionalLight(0xffffff, 0.5)
+// dirLight.castShadow = true
+// scene.add(dirLight)
+
+
+const params = {
+    uWaresFrequency:14,
+    uScale:0.03,
+    uXzScale:1.5,
+    uNoiseFrequency:10,
+    uNoiseScale:1.5,
+    uLowColor:'#ff0000',
+    uHightColor:'#ffff00',
+    uXspeed:1,
+    uZspeed:1,
+    uNoiseSpeed:1,
+    uOpacity:1
+}
+
+const shaderMaterial = new THREE.ShaderMaterial({
+    vertexShader:vertexShader,
+    fragmentShader:fragmentShader,
+    side:THREE.DoubleSide,
+    uniforms:{
+        uScale:{
+            value:params.uScale
+        },
+        uWaresFrequency:{
+            value:params.uWaresFrequency 
+        },
+        uXzScale:{
+            value:params.uXzScale
+        },
+        uNoiseFrequency:{
+            value:params.uNoiseFrequency
+        },
+        uNoiseScale:{
+            value:params.uNoiseScale
+        },
+        uTime:{
+            value:params.uTime
+        },
+        uLowColor:{
+            value:new THREE.Color(params.uLowColor)
+        },
+        uHightColor:{
+            value:new THREE.Color(params.uHightColor)
+        },
+        uXspeed:{
+            value:params.uXspeed
+        },
+        uZspeed:{
+            value:params.uZspeed
+        },
+        uNoiseSpeed:{
+            value:params.uNoiseSpeed
+        },
+        uOpacity:{
+            value:params.uOpacity
+        }
+    },
+    transparent:true,
+})
+
+
+
+// 添加gui控制器
+gui.add(params,'uWaresFrequency').min(1).max(100).step(0.1).name('格子数').onChange((value) => {
+    shaderMaterial.uniforms.uWaresFrequency.value = value
+})
+gui.add(params,'uScale').min(0).max(0.2).step(0.001).name('uScale').onChange(value => {
+    shaderMaterial.uniforms.uScale.value = value
+})
+gui.add(params,'uXzScale').min(0).max(5).step(0.1).name('uXzScale').onChange(value => {
+    shaderMaterial.uniforms.uXzScale.value = value
+})
+gui.add(params,'uNoiseFrequency').min(0).max(20).step(0.1).name('uNoiseFrequency').onChange(value => {
+    shaderMaterial.uniforms.uNoiseFrequency.value = value
+})
+gui.add(params,'uNoiseScale').min(0).max(0.2).step(0.001).name('uNoiseScale').onChange(value => {
+    shaderMaterial.uniforms.uNoiseScale.value = value
+})
+gui.addColor(params,'uLowColor').onFinishChange(value=>{
+    shaderMaterial.uniforms.uLowColor.value = new THREE.Color(value)
+})
+gui.addColor(params,'uHightColor').onFinishChange(value=>{
+    shaderMaterial.uniforms.uHightColor.value = new THREE.Color(value)
+})
+
+const plane = new THREE.Mesh(
+    new THREE.PlaneGeometry(1,1,1024,1024),
+    shaderMaterial
+)
+plane.rotation.x = -Math.PI /2
+scene.add(plane)
 
 
 
 // 初始化渲染器
 // const renderer = new THREE.WebGL1Renderer({ alpha: true })
 const renderer = new THREE.WebGL1Renderer({ alpha: true })
-renderer.outputEncoding = THREE.sRGBEncoding
-renderer.toneMapping = THREE.ACESFilmicToneMapping
+// renderer.outputEncoding = THREE.sRGBEncoding
+// 可能会导致颜色变成黑色，注意
+// renderer.toneMapping = THREE.ACESFilmicToneMapping
 // 设置曝光
-renderer.toneMappingExposure = 0.01
+// renderer.toneMappingExposure = 0.01
 
-const gltfLoader = new GLTFLoader()
-let lightBox = null
-gltfLoader.load('./model/fly.glb',(gltf)=>{
-    console.log(gltf);
-    // scene.add(gltf.scene)
-    lightBox = gltf.scene.children[0]
-    lightBox.material = shaderMaterial
-
-    for(let i=0;i<100;i++){
-        let flyLight =  gltf.scene.clone(true)
-        let x = (Math.random()-0.5)*300
-        let z = (Math.random()-0.5)*100
-        let y = (Math.random()-0.5)*30+25
-        flyLight.position.set(x,y,z)
-        gsap.to(flyLight.rotation,{
-            y:2*Math.PI,
-            duration:10+ Math.random()*10,
-            yoyo:true,
-            repeat:-1
-        })
-        gsap.to(flyLight.position,{
-           x:'+='+Math.random()*5,
-           y:'+='+Math.random()*20,
-           duration:5+ Math.random()*10,
-           yoyo:true,
-           repeat:-1
-        })
-        scene.add(flyLight)
-    }
-})
 // 设置渲染器的尺寸
 renderer.setSize(window.innerWidth, window.innerHeight)
 
 // 设置物体阴影
 // 第一步：渲染器开启阴影计算
 renderer.shadowMap.enabled = true
-// renderer.physicallyCorrectLights = true
+renderer.physicallyCorrectLights = true
 // 设置渲染器背景透明
 //new THREE.WebGL1Renderer({alpha:true})
 
@@ -135,34 +160,18 @@ const controls = new OrbitControls(camera, renderer.domElement)
 controls.enableDamping = true
 
 // 设置控制器的自动旋转
-controls.autoRotate = true
+// controls.autoRotate = true
 // 旋转的速度
-controls.autoRotateSpeed = 0.1
+// controls.autoRotateSpeed = 0.1
 // 旋转的角度
-controls.maxPolarAngle = Math.PI/4*3
-controls.minPolarAngle = Math.PI/4*3
+// controls.maxPolarAngle = Math.PI/4*3
+// controls.minPolarAngle = Math.PI/4*3
 
-// 创建坐标轴辅助器
-// const axesHelper = new THREE.AxesHelper(5)
-// scene.add(axesHelper)
+
 
 // render函数的时间只有一个，如果有多个物体则不方便，这时，可以使用Clock、
 let clock = new THREE.Clock()
 
-// function render() { 
-//     // 这个函数名可以叫render也可以叫animate等别的，注意下面函数调用和请求关键帧的参数即可
-//     // render函数会接收一个time参数，实际移动的距离需要根据时间和速度来计算,不能直接加一个固定的数值
-//     // 可以获取两帧之间的时间差  clock.getElapsedTime()
-//     // 设置小球随着大球做圆周运动
-//     let time = clock.getElapsedTime()
-//     let time2 = clock.getDelta()
-
-//     renderer.render(scene, camera)
-//     // 请求关键帧，下一帧的时候会继续调用render函数
-//     requestAnimationFrame(render)
-// }
-
-// render()
 
 function animate() { 
     // 这个函数名可以叫render也可以叫animate等别的，注意下面函数调用和请求关键帧的参数即可
@@ -172,7 +181,7 @@ function animate() {
     controls.update()
     let time = clock.getElapsedTime()
     let time2 = clock.getDelta()
-    // shaderMaterial.uniforms.uTime.value = time
+    shaderMaterial.uniforms.uTime.value = time
     renderer.render(scene, camera)
     // 请求关键帧，下一帧的时候会继续调用render函数
     requestAnimationFrame(animate)

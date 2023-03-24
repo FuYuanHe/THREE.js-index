@@ -61873,10 +61873,10 @@ World.prototype.clearForces = function(){
 },{"../collision/AABB":3,"../collision/ArrayCollisionMatrix":4,"../collision/NaiveBroadphase":7,"../collision/Ray":9,"../collision/RaycastResult":10,"../equations/ContactEquation":19,"../equations/FrictionEquation":21,"../material/ContactMaterial":24,"../material/Material":25,"../math/Quaternion":28,"../math/Vec3":30,"../objects/Body":31,"../shapes/Shape":43,"../solver/GSSolver":46,"../utils/EventTarget":49,"../utils/TupleDictionary":52,"../utils/Vec3Pool":54,"./Narrowphase":55}]},{},[2])
 (2)
 });
-},{}],"shader/flyLight/vertex.glsl":[function(require,module,exports) {
-module.exports = "precision lowp float;\n#define GLSLIFY 1\n // 声明gpu低精度 一般放在程序最前面\nattribute vec3 position;\nattribute vec2 uv;\n\nuniform mat4 modelMatrix;\nuniform mat4 viewMatrix;\nuniform mat4 projectionMatrix;\n\nvarying vec2 vUv; // 将顶点着色器的信息传递给片元着色器\nvarying vec4 vPosition;\nvarying vec3 gPosition;\n\nvoid main(){\n    vec4 modelPosition = modelMatrix *vec4(position,1.0);\n    vPosition = modelPosition;\n    gPosition = position;\n    gl_Position = projectionMatrix * viewMatrix * modelPosition;\n}";
-},{}],"shader/flyLight/fragment.glsl":[function(require,module,exports) {
-module.exports = "precision lowp float;\n#define GLSLIFY 1\n // 定义gpu编译精度\nvarying vec2 vUv; // 接收顶点着色器传递过来的vUv\n\nvarying vec4 vPosition;\nvarying vec3 gPosition;\n\nvoid main(){ \n     vec4 redcolor = vec4(1,0,0,1);\n     vec4 yelcolor = vec4(1,1,0,1);\n     vec4 mixColor = mix(yelcolor,redcolor,gPosition.y/1.0);\n     // gl_FragColor = vec4(mixColor.xyz,1);\n     if(gl_FrontFacing){\n          gl_FragColor = vec4(mixColor.xyz - (vPosition.y-20.0)/60.0-0.1 ,1);\n     }else{\n          gl_FragColor = vec4(mixColor.xyz,1);\n     };\n}";
+},{}],"shader/water/vertex.glsl":[function(require,module,exports) {
+module.exports = "precision lowp float;\n#define GLSLIFY 1\nuniform float uWaresFrequency;\nuniform float uScale;\nuniform float uXzScale;\nuniform float uNoiseFrequency;\nuniform float uNoiseScale;\nuniform float uTime;\nuniform float uXspeed;\nuniform float uZspeed;\nuniform float uNoiseSpeed;\nuniform float uOpacity;\n\nvarying float vElevation;\n#define PI 3.1415926535897932384626433832795\n\n// 随机函数\nfloat random (vec2 st){\n        return fract(sin(dot(st.xy,vec2(12.9898,78.233)))*43758.5453123);\n}\n// 旋转函数\nvec2 rotate(vec2 uv,float rotation ,vec2 mid){\n     return vec2(\n          cos(rotation) * (uv.x - mid.x) + sin(rotation) * (uv.y - mid.y) + mid.x,\n          cos(rotation) * (uv.y - mid.y) - sin(rotation) * (uv.x - mid.x) + mid.y\n     );\n}\n// 噪音函数\nfloat noise (in vec2 st) {\n    vec2 i = floor(st);\n    vec2 f = fract(st);\n\n    // Four corners in 2D of a tile\n    float a = random(i);\n    float b = random(i + vec2(1.0, 0.0));\n    float c = random(i + vec2(0.0, 1.0));\n    float d = random(i + vec2(1.0, 1.0));\n\n    // Smooth Interpolation\n\n    // Cubic Hermine Curve.  Same as SmoothStep()\n    vec2 u = f*f*(3.0-2.0*f);\n    // u = smoothstep(0.,1.,f);\n\n    // Mix 4 coorners percentages\n    return mix(a, b, u.x) +\n            (c - a)* u.y * (1.0 - u.x) +\n            (d - b) * u.x * u.y;\n}\n\nvec4 permute(vec4 x){\n        return mod(((x*34.0)+1.0)*x,289.0);\n}\n\nvec2 fade(vec2 t){\n        return t*t*t*(t*(t*6.0-15.0)+10.0);\n}\n\nfloat cnoise(vec2 p){\n        vec4 pi = floor(p.xyxy) + vec4(0.0,0.0,1.0,1.0);\n        vec4 pf = fract(p.xyxy) - vec4(0.0,0.0,1.0,1.0);\n        pi = mod(pi,289.0);\n        vec4 ix = pi.xzxz;\n        vec4 iy = pi.yyww;\n        vec4 fx = pf.xzxz;\n        vec4 fy = pf.yyww;\n        vec4 i = permute(permute(ix)+iy);\n        vec4 gx = 2.0 * fract(i*0.0243902439) - 1.0;\n        vec4 gy = abs(gx) - 0.5;\n        vec4 tx = floor(gx + 0.5);\n        gx = gx -tx;\n        vec2 g00 = vec2(gx.x,gy.x);\n        vec2 g10 = vec2(gx.y,gy.y);\n        vec2 g01 = vec2(gx.z,gy.z);\n        vec2 g11 = vec2(gx.w,gy.w);\n        vec4 norm = 1.79284291400159 - 0.85373472095314 * vec4(dot(g00,g00),dot(g01,g01),dot(g10,g10),dot(g11,g11));\n        g00 *= norm.x;\n        g01 *= norm.y;\n        g10 *= norm.z;\n        g11 *= norm.w;\n        float n00 = dot(g00,vec2(fx.x,fy.x));\n        float n10 = dot(g10,vec2(fx.y,fy.y));\n        float n01 = dot(g01,vec2(fx.z,fy.z));\n        float n11 = dot(g11,vec2(fx.w,fy.w));\n        vec2 fade_xy = fade(pf.xy);\n        vec2 n_x = mix(vec2(n00,n01),vec2(n10,n11),fade_xy.x);\n        float n_xy = mix(n_x.x,n_x.y,fade_xy.y);\n        return 2.3 * n_xy;\n}   \n\nvoid main(){\n    vec4 modelPosition = modelMatrix * vec4(position,1.0);\n\n    float elevation = sin(modelPosition.x*uWaresFrequency+uTime*uXspeed)*sin(modelPosition.z*uWaresFrequency*uXzScale+uTime*uZspeed);\n    elevation += -abs(cnoise(vec2(modelPosition.xz*uNoiseFrequency+uTime*uNoiseSpeed)))*uNoiseScale;\n    vElevation = elevation;\n    elevation *= uScale;\n    \n    modelPosition.y += elevation;\n    \n    gl_Position = projectionMatrix * viewMatrix * modelPosition;\n}";
+},{}],"shader/water/fragment.glsl":[function(require,module,exports) {
+module.exports = "precision lowp float;\n#define GLSLIFY 1\nvarying float vElevation;\nuniform vec3 uLowColor;\nuniform vec3 uHightColor;\nuniform float uOpacity;\n\nvoid main(){\n        float a = (vElevation+1.0)/2.0;\n        vec3 color = mix(uLowColor,uHightColor,a);\n        gl_FragColor = vec4(color,uOpacity);\n}\n";
 },{}],"main/main.js":[function(require,module,exports) {
 "use strict";
 
@@ -61887,24 +61887,17 @@ var _gsap = _interopRequireDefault(require("gsap"));
 var _RGBELoader = require("three/examples/jsm/loaders/RGBELoader");
 var _GLTFLoader = require("three/examples/jsm/loaders/GLTFLoader");
 var CANNON = _interopRequireWildcard(require("cannon"));
-var _vertex = _interopRequireDefault(require("../shader/flyLight/vertex.glsl"));
-var _fragment = _interopRequireDefault(require("../shader/flyLight/fragment.glsl"));
+var _vertex = _interopRequireDefault(require("../shader/water/vertex.glsl"));
+var _fragment = _interopRequireDefault(require("../shader/water/fragment.glsl"));
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 function _getRequireWildcardCache(nodeInterop) { if (typeof WeakMap !== "function") return null; var cacheBabelInterop = new WeakMap(); var cacheNodeInterop = new WeakMap(); return (_getRequireWildcardCache = function (nodeInterop) { return nodeInterop ? cacheNodeInterop : cacheBabelInterop; })(nodeInterop); }
 function _interopRequireWildcard(obj, nodeInterop) { if (!nodeInterop && obj && obj.__esModule) { return obj; } if (obj === null || typeof obj !== "object" && typeof obj !== "function") { return { default: obj }; } var cache = _getRequireWildcardCache(nodeInterop); if (cache && cache.has(obj)) { return cache.get(obj); } var newObj = {}; var hasPropertyDescriptor = Object.defineProperty && Object.getOwnPropertyDescriptor; for (var key in obj) { if (key !== "default" && Object.prototype.hasOwnProperty.call(obj, key)) { var desc = hasPropertyDescriptor ? Object.getOwnPropertyDescriptor(obj, key) : null; if (desc && (desc.get || desc.set)) { Object.defineProperty(newObj, key, desc); } else { newObj[key] = obj[key]; } } } newObj.default = obj; if (cache) { cache.set(obj, newObj); } return newObj; }
+// 创建gui的控制器
+var gui = new dat.GUI();
 // 创建相机
 var scene = new THREE.Scene();
 // 创建场景
 var camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 300);
-// 加载环境纹理
-var rgbeLoader = new _RGBELoader.RGBELoader();
-rgbeLoader.loadAsync('./texture/001.hdr').then(function (texture) {
-  texture.mapping = THREE.EquirectangularReflectionMapping;
-  scene.background = texture;
-  scene.environment = texture;
-});
-// const textureLoader = new THREE.TextureLoader()
-// const texture = textureLoader.load('./texture/bg.jpg')
 
 // 设置位置
 camera.position.set(0, 0, 18);
@@ -61912,94 +61905,119 @@ camera.position.set(0, 0, 18);
 // 把相机加到页面
 scene.add(camera);
 
-// 创建球和平面
-// const sphereGeomethy = new THREE.SphereGeometry(1,20,20)
-// const sphereMaterial = new THREE.MeshStandardMaterial()
-// const sphere = new THREE.Mesh(sphereGeomethy,sphereMaterial)
-// sphere.castShadow = true
-// scene.add(sphere)
-
-var material = new THREE.MeshBasicMaterial({
-  color: "#bfa"
-});
-// 编写程序实现材质
-var shaderMaterial = new THREE.RawShaderMaterial({
-  vertexShader: _vertex.default,
-  fragmentShader: _fragment.default,
-  // wireframe:true,
-  side: THREE.DoubleSide,
-  uniforms: {
-    uTime: {
-      value: 0
-    }
-    // uTexture:{
-    //     value:texture
-    // }
-  }
-  // transparent:true
-});
-
-// const floor = new THREE.Mesh(
-//     new THREE.PlaneGeometry(1,1,64, 64),
-//     shaderMaterial
-// )
-// floor.position.set(0, 0, 0)
-// // floor.rotation.x = -Math.PI / 2
-// // floor.receiveShadow = true
-// scene.add(floor)
+// 创建坐标轴辅助器
+var axesHelper = new THREE.AxesHelper(5);
+scene.add(axesHelper);
 
 // 添加环境光和平行光
-var ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-scene.add(ambientLight);
-var dirLight = new THREE.DirectionalLight(0xffffff, 0.5);
-dirLight.castShadow = true;
-scene.add(dirLight);
+// const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
+// scene.add(ambientLight)
+// const dirLight = new THREE.DirectionalLight(0xffffff, 0.5)
+// dirLight.castShadow = true
+// scene.add(dirLight)
+
+var params = {
+  uWaresFrequency: 14,
+  uScale: 0.03,
+  uXzScale: 1.5,
+  uNoiseFrequency: 10,
+  uNoiseScale: 1.5,
+  uLowColor: '#ff0000',
+  uHightColor: '#ffff00',
+  uXspeed: 1,
+  uZspeed: 1,
+  uNoiseSpeed: 1,
+  uOpacity: 1
+};
+var shaderMaterial = new THREE.ShaderMaterial({
+  vertexShader: _vertex.default,
+  fragmentShader: _fragment.default,
+  side: THREE.DoubleSide,
+  uniforms: {
+    uScale: {
+      value: params.uScale
+    },
+    uWaresFrequency: {
+      value: params.uWaresFrequency
+    },
+    uXzScale: {
+      value: params.uXzScale
+    },
+    uNoiseFrequency: {
+      value: params.uNoiseFrequency
+    },
+    uNoiseScale: {
+      value: params.uNoiseScale
+    },
+    uTime: {
+      value: params.uTime
+    },
+    uLowColor: {
+      value: new THREE.Color(params.uLowColor)
+    },
+    uHightColor: {
+      value: new THREE.Color(params.uHightColor)
+    },
+    uXspeed: {
+      value: params.uXspeed
+    },
+    uZspeed: {
+      value: params.uZspeed
+    },
+    uNoiseSpeed: {
+      value: params.uNoiseSpeed
+    },
+    uOpacity: {
+      value: params.uOpacity
+    }
+  },
+  transparent: true
+});
+
+// 添加gui控制器
+gui.add(params, 'uWaresFrequency').min(1).max(100).step(0.1).name('格子数').onChange(function (value) {
+  shaderMaterial.uniforms.uWaresFrequency.value = value;
+});
+gui.add(params, 'uScale').min(0).max(0.2).step(0.001).name('uScale').onChange(function (value) {
+  shaderMaterial.uniforms.uScale.value = value;
+});
+gui.add(params, 'uXzScale').min(0).max(5).step(0.1).name('uXzScale').onChange(function (value) {
+  shaderMaterial.uniforms.uXzScale.value = value;
+});
+gui.add(params, 'uNoiseFrequency').min(0).max(20).step(0.1).name('uNoiseFrequency').onChange(function (value) {
+  shaderMaterial.uniforms.uNoiseFrequency.value = value;
+});
+gui.add(params, 'uNoiseScale').min(0).max(0.2).step(0.001).name('uNoiseScale').onChange(function (value) {
+  shaderMaterial.uniforms.uNoiseScale.value = value;
+});
+gui.addColor(params, 'uLowColor').onFinishChange(function (value) {
+  shaderMaterial.uniforms.uLowColor.value = new THREE.Color(value);
+});
+gui.addColor(params, 'uHightColor').onFinishChange(function (value) {
+  shaderMaterial.uniforms.uHightColor.value = new THREE.Color(value);
+});
+var plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1, 1024, 1024), shaderMaterial);
+plane.rotation.x = -Math.PI / 2;
+scene.add(plane);
 
 // 初始化渲染器
 // const renderer = new THREE.WebGL1Renderer({ alpha: true })
 var renderer = new THREE.WebGL1Renderer({
   alpha: true
 });
-renderer.outputEncoding = THREE.sRGBEncoding;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
+// renderer.outputEncoding = THREE.sRGBEncoding
+// 可能会导致颜色变成黑色，注意
+// renderer.toneMapping = THREE.ACESFilmicToneMapping
 // 设置曝光
-renderer.toneMappingExposure = 0.01;
-var gltfLoader = new _GLTFLoader.GLTFLoader();
-var lightBox = null;
-gltfLoader.load('./model/fly.glb', function (gltf) {
-  console.log(gltf);
-  // scene.add(gltf.scene)
-  lightBox = gltf.scene.children[0];
-  lightBox.material = shaderMaterial;
-  for (var i = 0; i < 100; i++) {
-    var flyLight = gltf.scene.clone(true);
-    var x = (Math.random() - 0.5) * 300;
-    var z = (Math.random() - 0.5) * 100;
-    var y = (Math.random() - 0.5) * 30 + 25;
-    flyLight.position.set(x, y, z);
-    _gsap.default.to(flyLight.rotation, {
-      y: 2 * Math.PI,
-      duration: 10 + Math.random() * 10,
-      yoyo: true,
-      repeat: -1
-    });
-    _gsap.default.to(flyLight.position, {
-      x: '+=' + Math.random() * 5,
-      y: '+=' + Math.random() * 20,
-      duration: 5 + Math.random() * 10,
-      yoyo: true,
-      repeat: -1
-    });
-    scene.add(flyLight);
-  }
-});
+// renderer.toneMappingExposure = 0.01
+
 // 设置渲染器的尺寸
 renderer.setSize(window.innerWidth, window.innerHeight);
 
 // 设置物体阴影
 // 第一步：渲染器开启阴影计算
 renderer.shadowMap.enabled = true;
-// renderer.physicallyCorrectLights = true
+renderer.physicallyCorrectLights = true;
 // 设置渲染器背景透明
 //new THREE.WebGL1Renderer({alpha:true})
 
@@ -62012,35 +62030,15 @@ var controls = new _OrbitControls.OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 
 // 设置控制器的自动旋转
-controls.autoRotate = true;
+// controls.autoRotate = true
 // 旋转的速度
-controls.autoRotateSpeed = 0.1;
+// controls.autoRotateSpeed = 0.1
 // 旋转的角度
-controls.maxPolarAngle = Math.PI / 4 * 3;
-controls.minPolarAngle = Math.PI / 4 * 3;
-
-// 创建坐标轴辅助器
-// const axesHelper = new THREE.AxesHelper(5)
-// scene.add(axesHelper)
+// controls.maxPolarAngle = Math.PI/4*3
+// controls.minPolarAngle = Math.PI/4*3
 
 // render函数的时间只有一个，如果有多个物体则不方便，这时，可以使用Clock、
 var clock = new THREE.Clock();
-
-// function render() { 
-//     // 这个函数名可以叫render也可以叫animate等别的，注意下面函数调用和请求关键帧的参数即可
-//     // render函数会接收一个time参数，实际移动的距离需要根据时间和速度来计算,不能直接加一个固定的数值
-//     // 可以获取两帧之间的时间差  clock.getElapsedTime()
-//     // 设置小球随着大球做圆周运动
-//     let time = clock.getElapsedTime()
-//     let time2 = clock.getDelta()
-
-//     renderer.render(scene, camera)
-//     // 请求关键帧，下一帧的时候会继续调用render函数
-//     requestAnimationFrame(render)
-// }
-
-// render()
-
 function animate() {
   // 这个函数名可以叫render也可以叫animate等别的，注意下面函数调用和请求关键帧的参数即可
   // render函数会接收一个time参数，实际移动的距离需要根据时间和速度来计算,不能直接加一个固定的数值
@@ -62049,7 +62047,7 @@ function animate() {
   controls.update();
   var time = clock.getElapsedTime();
   var time2 = clock.getDelta();
-  // shaderMaterial.uniforms.uTime.value = time
+  shaderMaterial.uniforms.uTime.value = time;
   renderer.render(scene, camera);
   // 请求关键帧，下一帧的时候会继续调用render函数
   requestAnimationFrame(animate);
@@ -62067,7 +62065,7 @@ window.addEventListener('resize', function () {
   // 设置渲染器的像素比例
   renderer.setPixelRatio(window.devicePixelRatio);
 });
-},{"three":"../node_modules/three/build/three.module.js","three/examples/jsm/controls/OrbitControls":"../node_modules/three/examples/jsm/controls/OrbitControls.js","dat.gui":"../node_modules/dat.gui/build/dat.gui.module.js","gsap":"../node_modules/gsap/index.js","three/examples/jsm/loaders/RGBELoader":"../node_modules/three/examples/jsm/loaders/RGBELoader.js","three/examples/jsm/loaders/GLTFLoader":"../node_modules/three/examples/jsm/loaders/GLTFLoader.js","cannon":"../node_modules/cannon/build/cannon.js","../shader/flyLight/vertex.glsl":"shader/flyLight/vertex.glsl","../shader/flyLight/fragment.glsl":"shader/flyLight/fragment.glsl"}],"../node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
+},{"three":"../node_modules/three/build/three.module.js","three/examples/jsm/controls/OrbitControls":"../node_modules/three/examples/jsm/controls/OrbitControls.js","dat.gui":"../node_modules/dat.gui/build/dat.gui.module.js","gsap":"../node_modules/gsap/index.js","three/examples/jsm/loaders/RGBELoader":"../node_modules/three/examples/jsm/loaders/RGBELoader.js","three/examples/jsm/loaders/GLTFLoader":"../node_modules/three/examples/jsm/loaders/GLTFLoader.js","cannon":"../node_modules/cannon/build/cannon.js","../shader/water/vertex.glsl":"shader/water/vertex.glsl","../shader/water/fragment.glsl":"shader/water/fragment.glsl"}],"../node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
 var OldModule = module.bundle.Module;
@@ -62092,7 +62090,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "58115" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "56751" + '/');
   ws.onmessage = function (event) {
     checkedAssets = {};
     assetsToAccept = [];
