@@ -9,6 +9,9 @@ import * as CANNON from 'cannon'
 import vertexShader from '../shader/water/vertex.glsl'
 import fragmentShader from '../shader/water/fragment.glsl'
 
+// 导入water
+import {Water} from 'three/examples/jsm/objects/Water2'
+
 // 创建gui的控制器
 const gui = new dat.GUI();
 // 创建相机
@@ -23,17 +26,17 @@ camera.position.set(0, 0, 18)
 scene.add(camera)
 
 // 创建坐标轴辅助器
-const axesHelper = new THREE.AxesHelper(5)
-scene.add(axesHelper)
+// const axesHelper = new THREE.AxesHelper(5)
+// scene.add(axesHelper)
 
 
 
 // 添加环境光和平行光
 // const ambientLight = new THREE.AmbientLight(0xffffff, 0.5)
 // scene.add(ambientLight)
-// const dirLight = new THREE.DirectionalLight(0xffffff, 0.5)
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.5)
 // dirLight.castShadow = true
-// scene.add(dirLight)
+scene.add(dirLight)
 
 
 const params = {
@@ -96,36 +99,40 @@ const shaderMaterial = new THREE.ShaderMaterial({
 })
 
 
-
-// 添加gui控制器
-gui.add(params,'uWaresFrequency').min(1).max(100).step(0.1).name('格子数').onChange((value) => {
-    shaderMaterial.uniforms.uWaresFrequency.value = value
-})
-gui.add(params,'uScale').min(0).max(0.2).step(0.001).name('uScale').onChange(value => {
-    shaderMaterial.uniforms.uScale.value = value
-})
-gui.add(params,'uXzScale').min(0).max(5).step(0.1).name('uXzScale').onChange(value => {
-    shaderMaterial.uniforms.uXzScale.value = value
-})
-gui.add(params,'uNoiseFrequency').min(0).max(20).step(0.1).name('uNoiseFrequency').onChange(value => {
-    shaderMaterial.uniforms.uNoiseFrequency.value = value
-})
-gui.add(params,'uNoiseScale').min(0).max(0.2).step(0.001).name('uNoiseScale').onChange(value => {
-    shaderMaterial.uniforms.uNoiseScale.value = value
-})
-gui.addColor(params,'uLowColor').onFinishChange(value=>{
-    shaderMaterial.uniforms.uLowColor.value = new THREE.Color(value)
-})
-gui.addColor(params,'uHightColor').onFinishChange(value=>{
-    shaderMaterial.uniforms.uHightColor.value = new THREE.Color(value)
+const water = new Water(new THREE.PlaneGeometry(1,1,1024,1024),{
+    color:'#ffffff',
+    scale:1,
+    flowDirection:new THREE.Vector2(1,1),
+    textureHeight:1024,
+    textureWidth:1024,
 })
 
-const plane = new THREE.Mesh(
-    new THREE.PlaneGeometry(1,1,1024,1024),
-    shaderMaterial
-)
-plane.rotation.x = -Math.PI /2
-scene.add(plane)
+
+const loader = new RGBELoader()
+loader.loadAsync('./textures/050.hdr').then(texture =>{
+    texture.mapping = THREE.EquirectangularReflectionMapping
+    scene.background = texture
+    scene.environment = texture
+})
+const gLoader = new GLTFLoader()
+gLoader.load('./model/zaopen.glb',(gltf)=>{
+    // console.log('gltf',gltf);
+    // 设置澡盆
+    const pool = gltf.scene.children[0]
+    pool.material.side = THREE.DoubleSide
+    // 设置水面
+    const waterGeo = gltf.scene.children[1].geometry
+    const water = new Water(waterGeo,{
+        color:'#ffffff',
+        scale:1,
+        flowDirection:new THREE.Vector2(1,1),
+        textureHeight:1024,
+        textureWidth:1024,
+    })
+    // 添加物体
+    scene.add(pool)
+    scene.add(water)
+})
 
 
 
